@@ -12,6 +12,7 @@ export default function UserSignupPage() {
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [username, setUsername] = useState('')
   const [age, setAge] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -26,13 +27,14 @@ export default function UserSignupPage() {
   const ageNum = parseInt(age, 10)
   const validAge = age !== '' && !isNaN(ageNum) && ageNum >= 1 && ageNum <= 120
   const diagnosisValue = diagnosis === 'Other' ? otherDiagnosis.trim() : diagnosis
-  const canSubmit = !!(firstName.trim() && lastName.trim() && validAge && email.trim() && password.length >= 8 && passwordsMatch && diagnosisValue)
+  const validUsername = username.trim().length >= 3 && !/\s/.test(username)
+  const canSubmit = !!(firstName.trim() && lastName.trim() && validUsername && validAge && email.trim() && password.length >= 8 && passwordsMatch && diagnosisValue)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSubmit) return
     const result = registerUser(
-      { firstName: firstName.trim(), lastName: lastName.trim(), age: ageNum, email: email.trim(), diagnosis: diagnosisValue },
+      { firstName: firstName.trim(), lastName: lastName.trim(), username: username.trim().toLowerCase(), age: ageNum, email: email.trim(), diagnosis: diagnosisValue },
       password
     )
     if (result.ok) navigate('/dashboard')
@@ -68,6 +70,30 @@ export default function UserSignupPage() {
             <input style={inputStyle()} placeholder="Doe" value={lastName}
               onChange={e => setLastName(e.target.value)} onFocus={focusBlue} onBlur={blurDefault} />
           </div>
+        </div>
+
+        {/* Username */}
+        <div>
+          <label style={labelStyle}>Username</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+              color: 'var(--muted)', fontSize: 15, pointerEvents: 'none', userSelect: 'none',
+            }}>@</span>
+            <input
+              style={{ ...inputStyle(!!(username && !validUsername)), paddingLeft: 28 }}
+              placeholder="yourname"
+              value={username}
+              onChange={e => setUsername(e.target.value.replace(/\s/g, ''))}
+              onFocus={focusBlue}
+              onBlur={blurDefault}
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+          </div>
+          {username && !validUsername && (
+            <p style={{ color: 'var(--red)', fontSize: 12, marginTop: 4 }}>Must be at least 3 characters, no spaces.</p>
+          )}
         </div>
 
         {/* Age */}

@@ -5,10 +5,10 @@ export type Role = 'user' | 'caregiver' | null
 export interface UserProfile {
   firstName: string
   lastName: string
+  username: string
   age: number
   email: string
   diagnosis: string
-  pairingCode?: string
   pairedCaregiverUsername?: string
 }
 
@@ -16,7 +16,23 @@ export interface CaregiverProfile {
   name: string
   username: string
   email: string
-  pairedUserEmail?: string
+  pairedUserEmails?: string[]
+}
+
+export type ZoneColor = 'green' | 'yellow' | 'red'
+
+export interface ZoneEntry {
+  zone: ZoneColor
+  emotion: string | null
+  time: Date
+}
+
+export interface ClientInfo {
+  email: string
+  firstName: string
+  lastName: string
+  username: string
+  lastEntry: ZoneEntry | null
 }
 
 interface UserRecord {
@@ -39,29 +55,36 @@ interface AuthContextValue extends AuthState {
   registerUser: (profile: UserProfile, password: string) => { ok: boolean; error?: string }
   registerCaregiver: (profile: CaregiverProfile, password: string) => { ok: boolean; error?: string }
   login: (identifier: string, password: string) => { ok: boolean; role?: Role; error?: string }
-  generatePairingCode: () => string
-  submitPairingCode: (code: string) => { ok: boolean; caregiverName?: string; error?: string }
+  pairByUsername: (username: string) => { ok: boolean; error?: string }
+  logZoneEntry: (entry: ZoneEntry) => void
+  getClients: () => ClientInfo[]
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function makeCode(): string {
-  const n = Math.floor(100000 + Math.random() * 900000).toString()
-  return `${n.slice(0, 3)}-${n.slice(3)}`
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ role: null, user: null, caregiver: null })
   const [userStore, setUserStore] = useState<Map<string, UserRecord>>(new Map())
   const [caregiverStore, setCaregiverStore] = useState<Map<string, CaregiverRecord>>(new Map())
-  // code → user email — useRef so reads are always live, no stale-closure issues
-  const codeIndex = useRef<Map<string, string>>(new Map())
+  const [zoneStore, setZoneStore] = useState<Map<string, ZoneEntry[]>>(new Map())
+  // username (lowercase) → email — useRef so reads are always live
+  const userUsernameIndex = useRef<Map<string, string>>(new Map())
 
   function registerUser(profile: UserProfile, password: string) {
-    const key = profile.email.toLowerCase()
-    if (userStore.has(key)) return { ok: false, error: 'An account with that email already exists.' }
-    setUserStore(prev => new Map(prev).set(key, { profile, password }))
+    const emailKey = profile.email.toLowerCase()
+    const usernameKey = profile.username.toLowerCase()
+
+    if (userStore.has(emailKey)) return { ok: false, error: 'An account with that email already exists.' }
+    if (userUsernameIndex.current.has(usernameKey)) return { ok: false, error: 'That username is already taken.' }
+
+    // Check username isn't already used by a caregiver
+    for (const r of caregiverStore.values()) {
+      if (r.profile.username.toLowerCase() === usernameKey) return { ok: false, error: 'That username is already taken.' }
+    }
+
+    setUserStore(prev => new Map(prev).set(emailKey, { profile, password }))
+    userUsernameIndex.current.set(usernameKey, emailKey)
     setState({ role: 'user', user: profile, caregiver: null })
     return { ok: true }
   }
@@ -73,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (r.profile.email.toLowerCase() === emailKey) return { ok: false, error: 'An account with that email already exists.' }
       if (r.profile.username.toLowerCase() === usernameKey) return { ok: false, error: 'That username is already taken.' }
     }
+    // Also check against user usernames
+    if (userUsernameIndex.current.has(usernameKey)) return { ok: false, error: 'That username is already taken.' }
+
     setCaregiverStore(prev => new Map(prev).set(usernameKey, { profile, password }))
     setState({ role: 'caregiver', user: null, caregiver: profile })
     return { ok: true }
@@ -99,34 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: false, error: 'No account found with that username or email.' }
   }
 
-  function generatePairingCode() {
-    if (!state.user) return ''
-    const code = makeCode()
-    const emailKey = state.user.email.toLowerCase()
-
-    // Remove old code if any
-    if (state.user.pairingCode) {
-      codeIndex.current.delete(state.user.pairingCode)
-    }
-
-    const updatedProfile = { ...state.user, pairingCode: code }
-    setUserStore(prev => {
-      const m = new Map(prev)
-      const rec = m.get(emailKey)
-      if (rec) m.set(emailKey, { ...rec, profile: updatedProfile })
-      return m
-    })
-    codeIndex.current.set(code, emailKey)
-    setState(s => ({ ...s, user: updatedProfile }))
-    return code
-  }
-
-  // Called by caregiver to link to a user via their pairing code
-  function submitPairingCode(code: string) {
+  // Called by a caregiver to link to a user via their @username
+  function pairByUsername(rawUsername: string) {
     if (!state.caregiver) return { ok: false, error: 'Not signed in as a caregiver.' }
 
-    const userEmail = codeIndex.current.get(code)
-    if (!userEmail) return { ok: false, error: 'Invalid or expired pairing code.' }
+    const username = rawUsername.trim().toLowerCase().replace(/^@/, '')
+    if (!username) return { ok: false, error: 'Please enter a username.' }
+
+    const userEmail = userUsernameIndex.current.get(username)
+    if (!userEmail) return { ok: false, error: 'No user found with that username.' }
 
     const userRecord = userStore.get(userEmail)
     if (!userRecord) return { ok: false, error: 'User not found.' }
@@ -136,6 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const caregiverUsername = state.caregiver.username.toLowerCase()
 
+    // Prevent a caregiver pairing with the same user twice
+    const existingEmails = state.caregiver.pairedUserEmails ?? []
+    if (existingEmails.includes(userEmail)) {
+      return { ok: false, error: 'You are already paired with this user.' }
+    }
+
     // Mark user as paired
     const updatedUser = { ...userRecord.profile, pairedCaregiverUsername: caregiverUsername }
     setUserStore(prev => {
@@ -144,8 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return m
     })
 
-    // Mark caregiver as paired
-    const updatedCaregiver = { ...state.caregiver, pairedUserEmail: userEmail }
+    // Add user to caregiver's client list
+    const updatedCaregiver = { ...state.caregiver, pairedUserEmails: [...existingEmails, userEmail] }
     setCaregiverStore(prev => {
       const m = new Map(prev)
       const rec = m.get(caregiverUsername)
@@ -154,10 +167,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     setState(s => ({ ...s, caregiver: updatedCaregiver }))
 
-    // Invalidate the code
-    codeIndex.current.delete(code)
+    return { ok: true }
+  }
 
-    return { ok: true, caregiverName: state.caregiver.name }
+  function logZoneEntry(entry: ZoneEntry) {
+    if (!state.user) return
+    const key = state.user.email.toLowerCase()
+    setZoneStore(prev => {
+      const m = new Map(prev)
+      const existing = m.get(key) ?? []
+      m.set(key, [entry, ...existing])
+      return m
+    })
+  }
+
+  function getClients(): ClientInfo[] {
+    if (!state.caregiver) return []
+    const emails = state.caregiver.pairedUserEmails ?? []
+    return emails.map(email => {
+      const key = email.toLowerCase()
+      const record = userStore.get(key)
+      const entries = zoneStore.get(key) ?? []
+      return {
+        email,
+        firstName: record?.profile.firstName ?? '',
+        lastName: record?.profile.lastName ?? '',
+        username: record?.profile.username ?? '',
+        lastEntry: entries[0] ?? null,
+      }
+    })
   }
 
   function logout() {
@@ -165,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, registerUser, registerCaregiver, login, generatePairingCode, submitPairingCode, logout }}>
+    <AuthContext.Provider value={{ ...state, registerUser, registerCaregiver, login, pairByUsername, logZoneEntry, getClients, logout }}>
       {children}
     </AuthContext.Provider>
   )

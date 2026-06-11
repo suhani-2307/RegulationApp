@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
+import { useAuth } from '../contexts/AuthContext'
 
 type Zone = 'green' | 'yellow' | 'red'
 
@@ -42,6 +43,7 @@ interface LogEntry {
 
 export default function ZonesOfRegulationPage() {
   const navigate = useNavigate()
+  const { logZoneEntry } = useAuth()
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null)
   const [entries, setEntries] = useState<LogEntry[]>([])
@@ -60,7 +62,9 @@ export default function ZonesOfRegulationPage() {
 
   function handleCheckIn() {
     if (!selectedZone) return
-    setEntries(prev => [{ zone: selectedZone, emotion: selectedEmotion, time: new Date() }, ...prev])
+    const entry = { zone: selectedZone, emotion: selectedEmotion, time: new Date() }
+    logZoneEntry(entry)
+    setEntries(prev => [entry, ...prev])
     setJustLogged(true)
     setSelectedZone(null)
     setSelectedEmotion(null)

@@ -5,7 +5,7 @@ import ThemeToggle from '../components/ThemeToggle'
 import { ErrorBanner } from '../components/FormHelpers'
 
 export default function DashboardPage() {
-  const { role, user, caregiver, submitPairingCode, logout } = useAuth()
+  const { role, user, caregiver, pairByUsername, logout } = useAuth()
   const navigate = useNavigate()
 
   const isUser = role === 'user'
@@ -102,10 +102,13 @@ export default function DashboardPage() {
           onGoToPairing={() => navigate('/pairing')}
         />
       ) : caregiver ? (
-        <CaregiverPairingCard
-          pairedUserEmail={caregiver.pairedUserEmail}
-          submitPairingCode={submitPairingCode}
-        />
+        <>
+          <CaregiverClientsCard
+            clientCount={caregiver.pairedUserEmails?.length ?? 0}
+            onGoToClients={() => navigate('/clients')}
+          />
+          <CaregiverConnectCard pairByUsername={pairByUsername} />
+        </>
       ) : null}
     </div>
   )
@@ -162,54 +165,75 @@ function UserPairingCard({ pairedCaregiverUsername, onGoToPairing }: {
   )
 }
 
-function CaregiverPairingCard({ pairedUserEmail, submitPairingCode }: {
-  pairedUserEmail?: string
-  submitPairingCode: (code: string) => { ok: boolean; caregiverName?: string; error?: string }
+function CaregiverClientsCard({ clientCount, onGoToClients }: {
+  clientCount: number
+  onGoToClients: () => void
 }) {
-  const [code, setCode] = useState('')
+  return (
+    <button
+      onClick={onGoToClients}
+      style={{
+        width: '100%', padding: 20, borderRadius: 14, textAlign: 'left',
+        backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
+        cursor: 'pointer', transition: 'border-color 0.15s',
+        display: 'flex', alignItems: 'center', gap: 16,
+      }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--green)')}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+    >
+      <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'color-mix(in srgb, var(--green) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="9" cy="7" r="4" stroke="var(--green)" strokeWidth="1.5" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <div style={{ flex: 1 }}>
+        <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 3 }}>My Clients</p>
+        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+          {clientCount === 0 ? 'No clients paired yet' : `${clientCount} client${clientCount === 1 ? '' : 's'} connected`}
+        </p>
+      </div>
+      {clientCount > 0 && (
+        <div style={{ minWidth: 24, height: 24, borderRadius: 12, backgroundColor: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 7px' }}>
+          <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{clientCount}</span>
+        </div>
+      )}
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+        <path d="M9 18l6-6-6-6" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  )
+}
+
+function CaregiverConnectCard({ pairByUsername }: {
+  pairByUsername: (username: string) => { ok: boolean; error?: string }
+}) {
+  const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-
-  function formatCode(raw: string) {
-    const digits = raw.replace(/\D/g, '').slice(0, 6)
-    return digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits
-  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const result = submitPairingCode(code)
+    const result = pairByUsername(username)
     if (result.ok) {
-      setSuccess(`Paired successfully! You're now connected to your client.`)
-      setCode('')
+      setSuccess('Paired successfully! Client added to your list.')
+      setUsername('')
+      setTimeout(() => setSuccess(''), 4000)
     } else {
       setError(result.error ?? 'Something went wrong.')
     }
   }
 
-  const digitCount = code.replace(/\D/g, '').length
-
-  if (pairedUserEmail) {
-    return (
-      <div style={{ padding: 20, borderRadius: 14, backgroundColor: 'var(--surface)', border: '1px solid color-mix(in srgb, var(--green) 30%, transparent)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', backgroundColor: 'color-mix(in srgb, var(--green) 15%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-              <path d="M20 6L9 17l-5-5" stroke="var(--green)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600 }}>Paired with a client</p>
-        </div>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>Client account: <strong style={{ color: 'var(--text)' }}>{pairedUserEmail}</strong></p>
-      </div>
-    )
-  }
+  const canSubmit = username.trim().length >= 1
 
   return (
     <div style={{ padding: 20, borderRadius: 14, backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Connect to a client</p>
+      <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Connect a new client</p>
       <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 16 }}>
-        Ask your client for their 6-digit pairing code and enter it below.
+        Enter your client's username to link their account to yours.
       </p>
 
       {success ? (
@@ -222,29 +246,35 @@ function CaregiverPairingCard({ pairedUserEmail, submitPairingCode }: {
         </div>
       ) : (
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <input
-            value={code}
-            onChange={e => { setCode(formatCode(e.target.value)); setError('') }}
-            placeholder="000-000"
-            maxLength={7}
-            style={{
-              width: '100%', padding: '14px 16px', borderRadius: 12, fontSize: 22,
-              fontWeight: 700, letterSpacing: '0.3em', textAlign: 'center',
-              backgroundColor: 'var(--bg)', border: `1px solid ${digitCount === 6 ? 'var(--green)' : 'var(--border)'}`,
-              color: 'var(--text)', outline: 'none', transition: 'border-color 0.15s',
-            }}
-            onFocus={e => (e.currentTarget.style.borderColor = 'var(--blue)')}
-            onBlur={e => (e.currentTarget.style.borderColor = digitCount === 6 ? 'var(--green)' : 'var(--border)')}
-          />
+          <div style={{ position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+              color: 'var(--muted)', fontSize: 15, pointerEvents: 'none',
+            }}>@</span>
+            <input
+              value={username}
+              onChange={e => { setUsername(e.target.value.replace(/\s/g, '')); setError('') }}
+              placeholder="clientusername"
+              autoCapitalize="none"
+              autoCorrect="off"
+              style={{
+                width: '100%', padding: '14px 16px 14px 28px', borderRadius: 12, fontSize: 15,
+                backgroundColor: 'var(--bg)', border: '1px solid var(--border)',
+                color: 'var(--text)', outline: 'none', transition: 'border-color 0.15s',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--blue)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+            />
+          </div>
           {error && <ErrorBanner message={error} />}
           <button
             type="submit"
-            disabled={digitCount !== 6}
+            disabled={!canSubmit}
             style={{
               width: '100%', padding: '13px', borderRadius: 12, fontWeight: 600, fontSize: 14,
               backgroundColor: 'var(--green)', color: '#fff',
-              opacity: digitCount === 6 ? 1 : 0.35,
-              cursor: digitCount === 6 ? 'pointer' : 'default',
+              opacity: canSubmit ? 1 : 0.35,
+              cursor: canSubmit ? 'pointer' : 'default',
               transition: 'opacity 0.2s',
             }}
           >

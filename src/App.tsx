@@ -8,6 +8,7 @@ import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import PairingPage from './pages/PairingPage'
 import ZonesOfRegulationPage from './pages/ZonesOfRegulationPage'
+import ClientsPage from './pages/ClientsPage'
 import type { ReactNode } from 'react'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -46,6 +47,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <ZonesOfRegulationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/clients"
+            element={
+              <ProtectedRoute>
+                <ClientsPage />
               </ProtectedRoute>
             }
           />
