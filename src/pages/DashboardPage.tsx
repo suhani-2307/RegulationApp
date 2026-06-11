@@ -69,6 +69,32 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
+      {/* Zones of regulation */}
+      {isUser && (
+        <button
+          onClick={() => navigate('/zones')}
+          style={{
+            width: '100%', padding: 20, borderRadius: 14, textAlign: 'left',
+            backgroundColor: 'var(--surface)', border: '1px solid var(--border)',
+            cursor: 'pointer', transition: 'border-color 0.15s',
+            display: 'flex', alignItems: 'center', gap: 16,
+          }}
+          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--blue)')}
+          onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: 'color-mix(in srgb, var(--blue) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>
+            🟢
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 3 }}>Zones of Regulation</p>
+            <p style={{ color: 'var(--muted)', fontSize: 13 }}>Log how you're feeling right now</p>
+          </div>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+            <path d="M9 18l6-6-6-6" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      )}
+
       {/* Pairing section */}
       {isUser && user ? (
         <UserPairingCard
