@@ -1,0 +1,66 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Lexend', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* ── Dark theme (default) ── */
+:root {
+  --bg:        #101922;
+  --surface:   #1c2632;
+  --surface2:  #1e293b;
+  --border:    #1e293b;
+  --text:      #f1f5f9;
+  --muted:     #94a3b8;
+  --input-ph:  #4a5568;
+  --blue:      #137fec;
+  --green:     #4ade80;
+  --red:       #f87171;
+  --yellow:    #fbbf24;
+  --error-bg:  rgba(248,113,113,0.1);
+  --error-bd:  rgba(248,113,113,0.25);
+}
+
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg:        #f0f4f8;
+  --surface:   #ffffff;
+  --surface2:  #e8edf2;
+  --border:    #cbd5e1;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --input-ph:  #94a3b8;
+  --blue:      #0f6fcc;
+  --green:     #16a34a;
+  --red:       #dc2626;
+  --yellow:    #d97706;
+  --error-bg:  rgba(220,38,38,0.08);
+  --error-bd:  rgba(220,38,38,0.2);
+}
