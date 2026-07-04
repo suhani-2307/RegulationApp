@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -39,10 +39,13 @@ interface LogEntry {
   zone: Zone
   emotion: string | null
   time: Date
+  location?: string
 }
 
 export default function ZonesOfRegulationPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const checkInLocation = (location.state as { location?: string } | null)?.location ?? null
   const { logZoneEntry } = useAuth()
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null)
@@ -62,7 +65,19 @@ export default function ZonesOfRegulationPage() {
 
   function handleCheckIn() {
     if (!selectedZone) return
-    const entry = { zone: selectedZone, emotion: selectedEmotion, time: new Date() }
+    if (selectedZone === 'red') {
+      navigate('/calming-routine', { state: { emotion: selectedEmotion, location: checkInLocation } })
+      return
+    }
+    if (selectedZone === 'yellow') {
+      navigate('/yellow-routine', { state: { emotion: selectedEmotion, location: checkInLocation } })
+      return
+    }
+    if (selectedZone === 'green') {
+      navigate('/green-routine', { state: { emotion: selectedEmotion, location: checkInLocation } })
+      return
+    }
+    const entry = { zone: selectedZone, emotion: selectedEmotion, time: new Date(), location: checkInLocation ?? undefined }
     logZoneEntry(entry)
     setEntries(prev => [entry, ...prev])
     setJustLogged(true)
@@ -92,7 +107,8 @@ export default function ZonesOfRegulationPage() {
           title="Back to dashboard"
         >
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-            <path d="M15 18l-6-6 6-6" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 11l9-8 9 8" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         <ThemeToggle />
@@ -106,6 +122,11 @@ export default function ZonesOfRegulationPage() {
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>
           Tap a zone to log how you're feeling right now.
         </p>
+        {checkInLocation && (
+          <p style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 6 }}>
+            📍 Checked in at <strong style={{ color: 'var(--text)' }}>{checkInLocation}</strong>
+          </p>
+        )}
       </div>
 
       {/* Success flash */}
@@ -232,7 +253,13 @@ export default function ZonesOfRegulationPage() {
                   onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
                   onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                 >
-                  {selectedEmotion ? `Log: ${selectedEmotion}` : 'Log this zone'}
+                  {zone.id === 'red'
+                    ? 'Start Calming Routine'
+                    : zone.id === 'yellow'
+                    ? 'Start Yellow Routine'
+                    : zone.id === 'green'
+                    ? 'View Green Zone Tools'
+                    : selectedEmotion ? `Log: ${selectedEmotion}` : 'Log this zone'}
                 </button>
               </div>
             )}
@@ -262,7 +289,7 @@ export default function ZonesOfRegulationPage() {
                     backgroundColor: zone.color, flexShrink: 0,
                   }} />
                   <span style={{ color: 'var(--text)', fontSize: 13, flex: 1 }}>
-                    {zone.label}{entry.emotion ? ` · ${entry.emotion}` : ''}
+                    {zone.label}{entry.emotion ? ` · ${entry.emotion}` : ''}{entry.location ? ` · ${entry.location}` : ''}
                   </span>
                   <span style={{ color: 'var(--muted)', fontSize: 12 }}>{time}</span>
                 </div>

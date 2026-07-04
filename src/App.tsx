@@ -7,7 +7,11 @@ import CaregiverSignupPage from './pages/CaregiverSignupPage'
 import SignInPage from './pages/SignInPage'
 import DashboardPage from './pages/DashboardPage'
 import PairingPage from './pages/PairingPage'
+import LocationCheckInPage from './pages/LocationCheckInPage'
 import ZonesOfRegulationPage from './pages/ZonesOfRegulationPage'
+import CalmingRoutinePage from './pages/CalmingRoutinePage'
+import YellowRoutinePage from './pages/YellowRoutinePage'
+import GreenRoutinePage from './pages/GreenRoutinePage'
 import ClientsPage from './pages/ClientsPage'
 import type { ReactNode } from 'react'
 
@@ -43,10 +47,42 @@ function AppRoutes() {
             }
           />
           <Route
+            path="/check-in"
+            element={
+              <ProtectedRoute>
+                <LocationCheckInPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/zones"
             element={
               <ProtectedRoute>
                 <ZonesOfRegulationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calming-routine"
+            element={
+              <ProtectedRoute>
+                <CalmingRoutinePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/yellow-routine"
+            element={
+              <ProtectedRoute>
+                <YellowRoutinePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/green-routine"
+            element={
+              <ProtectedRoute>
+                <GreenRoutinePage />
               </ProtectedRoute>
             }
           />

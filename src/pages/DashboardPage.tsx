@@ -72,7 +72,7 @@ export default function DashboardPage() {
       {/* Zones of regulation */}
       {isUser && (
         <button
-          onClick={() => navigate('/zones')}
+          onClick={() => navigate('/check-in')}
           style={{
             width: '100%', padding: 20, borderRadius: 14, textAlign: 'left',
             backgroundColor: 'var(--surface)', border: '1px solid var(--border)',

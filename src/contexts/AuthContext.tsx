@@ -25,6 +25,7 @@ export interface ZoneEntry {
   zone: ZoneColor
   emotion: string | null
   time: Date
+  location?: string
 }
 
 export interface ClientInfo {
