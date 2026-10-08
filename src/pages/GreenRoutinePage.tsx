@@ -1,20 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, newSessionId } from '../contexts/AuthContext'
 
 export default function GreenRoutinePage() {
   const navigate = useNavigate()
   const routeLocation = useLocation()
-  const { emotion, location } = (routeLocation.state as { emotion?: string | null; location?: string | null } | null) ?? {}
+  const { emotion, location, sessionId } = (routeLocation.state as { emotion?: string | null; location?: string | null; sessionId?: string } | null) ?? {}
   const { logZoneEntry } = useAuth()
   const hasLogged = useRef(false)
 
   useEffect(() => {
     if (hasLogged.current) return
     hasLogged.current = true
-    logZoneEntry({ zone: 'green', emotion: emotion ?? null, time: new Date(), location: location ?? undefined })
-  }, [emotion, location, logZoneEntry])
+    logZoneEntry({ zone: 'green', emotion: emotion ?? null, time: new Date(), location: location ?? undefined, sessionId: sessionId ?? newSessionId() })
+  }, [emotion, location, sessionId, logZoneEntry])
 
   return (
     <div style={{
@@ -28,17 +28,18 @@ export default function GreenRoutinePage() {
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
-          onClick={() => navigate('/zones')}
+          onClick={() => navigate('/dashboard')}
           style={{
             width: 36, height: 36, borderRadius: '50%',
             backgroundColor: 'var(--surface)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: '1px solid var(--border)', cursor: 'pointer', flexShrink: 0,
           }}
-          title="Back to zones"
+          title="Back to dashboard"
         >
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-            <path d="M15 18l-6-6 6-6" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 11l9-8 9 8" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9" stroke="var(--muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         <p style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700 }}>Check In</p>

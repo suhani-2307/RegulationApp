@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, newSessionId } from '../contexts/AuthContext'
 
 const STEPS = [
   { id: 'breathe', label: 'Take 5 slow, deep breaths.', icon: '🌬️' },
@@ -12,7 +12,7 @@ const STEPS = [
 export default function CalmingRoutinePage() {
   const navigate = useNavigate()
   const routeLocation = useLocation()
-  const { emotion, location } = (routeLocation.state as { emotion?: string | null; location?: string | null } | null) ?? {}
+  const { emotion, location, sessionId } = (routeLocation.state as { emotion?: string | null; location?: string | null; sessionId?: string } | null) ?? {}
   const { logZoneEntry } = useAuth()
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [completed, setCompleted] = useState(false)
@@ -28,9 +28,10 @@ export default function CalmingRoutinePage() {
 
   function handleComplete() {
     if (completed) return
-    logZoneEntry({ zone: 'red', emotion: emotion ?? null, time: new Date(), location: location ?? undefined })
+    logZoneEntry({ zone: 'red', emotion: emotion ?? null, time: new Date(), location: location ?? undefined, sessionId: sessionId ?? newSessionId() })
     setCompleted(true)
-    setTimeout(() => navigate('/dashboard'), 1000)
+    // Loop back to zone selection until the user reports being in the green zone
+    setTimeout(() => navigate('/zones', { state: { location, sessionId, recheck: true } }), 1000)
   }
 
   return (
@@ -45,7 +46,7 @@ export default function CalmingRoutinePage() {
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
-          onClick={() => navigate('/zones')}
+          onClick={() => navigate('/zones', { state: { location, sessionId } })}
           style={{
             width: 36, height: 36, borderRadius: '50%',
             backgroundColor: 'var(--surface)',
@@ -91,7 +92,7 @@ export default function CalmingRoutinePage() {
             <circle cx="12" cy="12" r="10" stroke="var(--green)" strokeWidth="1.5" />
             <path d="M8 12l3 3 5-5" stroke="var(--green)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <p style={{ color: 'var(--green)', fontSize: 13, fontWeight: 500 }}>Routine complete! Heading home...</p>
+          <p style={{ color: 'var(--green)', fontSize: 13, fontWeight: 500 }}>Routine complete! Let's check in again...</p>
         </div>
       )}
 

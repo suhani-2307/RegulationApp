@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, newSessionId } from '../contexts/AuthContext'
 
 type Zone = 'green' | 'yellow' | 'red'
 
@@ -45,7 +45,11 @@ interface LogEntry {
 export default function ZonesOfRegulationPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const checkInLocation = (location.state as { location?: string } | null)?.location ?? null
+  const routeState = location.state as { location?: string | null; recheck?: boolean; sessionId?: string } | null
+  const checkInLocation = routeState?.location ?? null
+  const isRecheck = routeState?.recheck ?? false
+  // Continue the session when looping back from a routine; otherwise this is a new session
+  const [sessionId] = useState(() => routeState?.sessionId ?? newSessionId())
   const { logZoneEntry } = useAuth()
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null)
@@ -66,18 +70,18 @@ export default function ZonesOfRegulationPage() {
   function handleCheckIn() {
     if (!selectedZone) return
     if (selectedZone === 'red') {
-      navigate('/calming-routine', { state: { emotion: selectedEmotion, location: checkInLocation } })
+      navigate('/calming-routine', { state: { emotion: selectedEmotion, location: checkInLocation, sessionId } })
       return
     }
     if (selectedZone === 'yellow') {
-      navigate('/yellow-routine', { state: { emotion: selectedEmotion, location: checkInLocation } })
+      navigate('/yellow-routine', { state: { emotion: selectedEmotion, location: checkInLocation, sessionId } })
       return
     }
     if (selectedZone === 'green') {
-      navigate('/green-routine', { state: { emotion: selectedEmotion, location: checkInLocation } })
+      navigate('/green-routine', { state: { emotion: selectedEmotion, location: checkInLocation, sessionId } })
       return
     }
-    const entry = { zone: selectedZone, emotion: selectedEmotion, time: new Date(), location: checkInLocation ?? undefined }
+    const entry = { zone: selectedZone, emotion: selectedEmotion, time: new Date(), location: checkInLocation ?? undefined, sessionId }
     logZoneEntry(entry)
     setEntries(prev => [entry, ...prev])
     setJustLogged(true)
@@ -120,7 +124,9 @@ export default function ZonesOfRegulationPage() {
           Zones of Regulation
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          Tap a zone to log how you're feeling right now.
+          {isRecheck
+            ? 'Nice work! How are you feeling now?'
+            : "Tap a zone to log how you're feeling right now."}
         </p>
         {checkInLocation && (
           <p style={{ color: 'var(--muted)', fontSize: 12.5, marginTop: 6 }}>

@@ -26,6 +26,12 @@ export interface ZoneEntry {
   emotion: string | null
   time: Date
   location?: string
+  // Groups the check-ins from one pass through the zones loop (e.g. yellow → green)
+  sessionId: string
+}
+
+export function newSessionId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 export interface ClientInfo {
@@ -59,6 +65,7 @@ interface AuthContextValue extends AuthState {
   pairByUsername: (username: string) => { ok: boolean; error?: string }
   logZoneEntry: (entry: ZoneEntry) => void
   getClients: () => ClientInfo[]
+  getMyEntries: () => ZoneEntry[]
   logout: () => void
 }
 
@@ -199,12 +206,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  // Newest first, since logZoneEntry prepends
+  function getMyEntries(): ZoneEntry[] {
+    if (!state.user) return []
+    return zoneStore.get(state.user.email.toLowerCase()) ?? []
+  }
+
   function logout() {
     setState({ role: null, user: null, caregiver: null })
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, registerUser, registerCaregiver, login, pairByUsername, logZoneEntry, getClients, logout }}>
+    <AuthContext.Provider value={{ ...state, registerUser, registerCaregiver, login, pairByUsername, logZoneEntry, getClients, getMyEntries, logout }}>
       {children}
     </AuthContext.Provider>
   )
