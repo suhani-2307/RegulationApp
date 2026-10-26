@@ -3,21 +3,26 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
 import { useAuth, newSessionId } from '../contexts/AuthContext'
 
-const STEPS = [
-  { id: 'breathe', label: 'Take 5 slow, deep breaths.', icon: '🌬️' },
-  { id: 'sensory', label: 'Try a fidget or sensory tool.', icon: '🧴' },
-  { id: 'eyes', label: 'Close your eyes for a moment.', icon: '🙈' },
+const OPTIONS = [
+  { id: 'walk', label: 'Take a walk', icon: '🚶' },
+  { id: 'cubicle', label: 'Go to my cubicle', icon: '🪑' },
+  { id: 'story', label: 'Read my social story', icon: '📖' },
 ]
 
 export default function CalmingRoutinePage() {
   const navigate = useNavigate()
   const routeLocation = useLocation()
-  const { emotion, location, sessionId } = (routeLocation.state as { emotion?: string | null; location?: string | null; sessionId?: string } | null) ?? {}
+  const { emotion, location, sessionId, selected: initialChecked } = (routeLocation.state as { emotion?: string | null; location?: string | null; sessionId?: string; selected?: string[] } | null) ?? {}
   const { logZoneEntry } = useAuth()
-  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [checked, setChecked] = useState<Set<string>>(new Set(initialChecked))
   const [completed, setCompleted] = useState(false)
 
   function toggleStep(id: string) {
+    // Choosing the social story opens it; it's marked done when the student finishes reading
+    if (id === 'story' && !checked.has(id)) {
+      navigate('/social-story', { state: { zone: 'red', emotion, location, sessionId, selected: [...checked] } })
+      return
+    }
     setChecked(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -77,7 +82,6 @@ export default function CalmingRoutinePage() {
         padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       }}>
         <div style={{ fontSize: 48, marginBottom: 4 }}>🧘</div>
-        <p style={{ color: 'var(--red)', fontSize: 17, fontWeight: 700 }}>Calming Routine</p>
       </div>
 
       {/* Success flash */}
@@ -98,7 +102,7 @@ export default function CalmingRoutinePage() {
 
       {/* Steps */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {STEPS.map(step => {
+        {OPTIONS.map(step => {
           const isChecked = checked.has(step.id)
           return (
             <div

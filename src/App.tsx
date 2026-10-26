@@ -11,6 +11,7 @@ import LocationCheckInPage from './pages/LocationCheckInPage'
 import ZonesOfRegulationPage from './pages/ZonesOfRegulationPage'
 import CalmingRoutinePage from './pages/CalmingRoutinePage'
 import YellowRoutinePage from './pages/YellowRoutinePage'
+import SocialStoryPage from './pages/SocialStoryPage'
 import GreenRoutinePage from './pages/GreenRoutinePage'
 import ClientsPage from './pages/ClientsPage'
 import type { ReactNode } from 'react'
@@ -75,6 +76,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <YellowRoutinePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/social-story"
+            element={
+              <ProtectedRoute>
+                <SocialStoryPage />
               </ProtectedRoute>
             }
           />

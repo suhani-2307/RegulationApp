@@ -11,12 +11,17 @@ const OPTIONS = [
 export default function YellowRoutinePage() {
   const navigate = useNavigate()
   const routeLocation = useLocation()
-  const { emotion, location, sessionId } = (routeLocation.state as { emotion?: string | null; location?: string | null; sessionId?: string } | null) ?? {}
+  const { emotion, location, sessionId, selected: initialSelected } = (routeLocation.state as { emotion?: string | null; location?: string | null; sessionId?: string; selected?: string[] } | null) ?? {}
   const { logZoneEntry } = useAuth()
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected))
   const [completed, setCompleted] = useState(false)
 
   function toggleOption(id: string) {
+    // Choosing the social story opens it; it's marked done when the student finishes reading
+    if (id === 'story' && !selected.has(id)) {
+      navigate('/social-story', { state: { zone: 'yellow', emotion, location, sessionId, selected: [...selected] } })
+      return
+    }
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
