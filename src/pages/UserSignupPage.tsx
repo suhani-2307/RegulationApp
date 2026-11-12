@@ -30,10 +30,10 @@ export default function UserSignupPage() {
   const validUsername = username.trim().length >= 3 && !/\s/.test(username)
   const canSubmit = !!(firstName.trim() && lastName.trim() && validUsername && validAge && email.trim() && password.length >= 8 && passwordsMatch && diagnosisValue)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSubmit) return
-    const result = registerUser(
+    const result = await registerUser(
       { firstName: firstName.trim(), lastName: lastName.trim(), username: username.trim().toLowerCase(), age: ageNum, email: email.trim(), diagnosis: diagnosisValue },
       password
     )

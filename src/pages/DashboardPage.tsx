@@ -219,16 +219,16 @@ function CaregiverClientsCard({ clientCount, onGoToClients }: {
 }
 
 function CaregiverConnectCard({ pairByUsername }: {
-  pairByUsername: (username: string) => { ok: boolean; error?: string }
+  pairByUsername: (username: string) => Promise<{ ok: boolean; error?: string }>
 }) {
   const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const result = pairByUsername(username)
+    const result = await pairByUsername(username)
     if (result.ok) {
       setSuccess('Paired successfully! Client added to your list.')
       setUsername('')

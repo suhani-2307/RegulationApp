@@ -20,10 +20,10 @@ export default function CaregiverSignupPage() {
   const passwordsMatch = password === confirm
   const canSubmit = !!(name.trim() && username.trim() && email.trim() && password.length >= 8 && passwordsMatch)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSubmit) return
-    const result = registerCaregiver({ name: name.trim(), username: username.trim(), email: email.trim() }, password)
+    const result = await registerCaregiver({ name: name.trim(), username: username.trim(), email: email.trim() }, password)
     if (result.ok) navigate('/dashboard')
     else setError(result.error ?? 'Something went wrong.')
   }

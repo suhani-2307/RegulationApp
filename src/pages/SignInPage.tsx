@@ -15,10 +15,10 @@ export default function SignInPage() {
 
   const canSubmit = identifier.trim().length > 0 && password.length > 0
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSubmit) return
-    const result = login(identifier.trim(), password)
+    const result = await login(identifier.trim(), password)
     if (result.ok) navigate('/dashboard')
     else setError(result.error ?? 'Something went wrong.')
   }

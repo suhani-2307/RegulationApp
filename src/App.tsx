@@ -17,7 +17,9 @@ import ClientsPage from './pages/ClientsPage'
 import type { ReactNode } from 'react'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { role } = useAuth()
+  const { role, loading } = useAuth()
+  // Wait for a saved session to be restored before deciding to redirect
+  if (loading) return null
   if (!role) return <Navigate to="/" replace />
   return <>{children}</>
 }

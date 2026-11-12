@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useRef, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
 export type Role = 'user' | 'caregiver' | null
 
@@ -42,182 +42,182 @@ export interface ClientInfo {
   lastEntry: ZoneEntry | null
 }
 
-interface UserRecord {
-  profile: UserProfile
-  password: string
-}
-
-interface CaregiverRecord {
-  profile: CaregiverProfile
-  password: string
-}
-
 interface AuthState {
   role: Role
   user: UserProfile | null
   caregiver: CaregiverProfile | null
 }
 
+type Result = { ok: boolean; error?: string }
+
 interface AuthContextValue extends AuthState {
-  registerUser: (profile: UserProfile, password: string) => { ok: boolean; error?: string }
-  registerCaregiver: (profile: CaregiverProfile, password: string) => { ok: boolean; error?: string }
-  login: (identifier: string, password: string) => { ok: boolean; role?: Role; error?: string }
-  pairByUsername: (username: string) => { ok: boolean; error?: string }
+  // True while restoring a saved session on page load
+  loading: boolean
+  registerUser: (profile: UserProfile, password: string) => Promise<Result>
+  registerCaregiver: (profile: CaregiverProfile, password: string) => Promise<Result>
+  login: (identifier: string, password: string) => Promise<Result & { role?: Role }>
+  pairByUsername: (username: string) => Promise<Result>
   logZoneEntry: (entry: ZoneEntry) => void
-  getClients: () => ClientInfo[]
+  getClients: () => Promise<ClientInfo[]>
   getMyEntries: () => ZoneEntry[]
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+// ---------- API helpers ----------
+
+const TOKEN_KEY = 'regulation-app-token'
+const PROFILE_REFRESH_MS = 15000
+
+function getToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+function setToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch { /* storage unavailable — session just won't survive a refresh */ }
+}
+
+class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message) }
+}
+
+async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+  const token = getToken()
+  let res: Response
+  try {
+    res = await fetch(`/api${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    })
+  } catch {
+    throw new ApiError('Could not reach the server. Check your connection.', 0)
+  }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ApiError(data.error ?? 'Something went wrong.', res.status)
+  return data as T
+}
+
+const errorMessage = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong.')
+
+// The API sends times as ISO strings; the app works with Date objects
+type ApiZoneEntry = Omit<ZoneEntry, 'time'> & { time: string }
+const toEntry = (e: ApiZoneEntry): ZoneEntry => ({ ...e, time: new Date(e.time) })
+
+type SessionResponse = AuthState & { token?: string }
+
+// ---------- provider ----------
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ role: null, user: null, caregiver: null })
-  const [userStore, setUserStore] = useState<Map<string, UserRecord>>(new Map())
-  const [caregiverStore, setCaregiverStore] = useState<Map<string, CaregiverRecord>>(new Map())
-  const [zoneStore, setZoneStore] = useState<Map<string, ZoneEntry[]>>(new Map())
-  // username (lowercase) → email — useRef so reads are always live
-  const userUsernameIndex = useRef<Map<string, string>>(new Map())
+  const [loading, setLoading] = useState(() => !!getToken())
+  const [myEntries, setMyEntries] = useState<ZoneEntry[]>([])
 
-  function registerUser(profile: UserProfile, password: string) {
-    const emailKey = profile.email.toLowerCase()
-    const usernameKey = profile.username.toLowerCase()
+  const applySession = useCallback((s: SessionResponse) => {
+    if (s.token) setToken(s.token)
+    setState({ role: s.role, user: s.user, caregiver: s.caregiver })
+  }, [])
 
-    if (userStore.has(emailKey)) return { ok: false, error: 'An account with that email already exists.' }
-    if (userUsernameIndex.current.has(usernameKey)) return { ok: false, error: 'That username is already taken.' }
+  const logout = useCallback(() => {
+    setToken(null)
+    setState({ role: null, user: null, caregiver: null })
+    setMyEntries([])
+  }, [])
 
-    // Check username isn't already used by a caregiver
-    for (const r of caregiverStore.values()) {
-      if (r.profile.username.toLowerCase() === usernameKey) return { ok: false, error: 'That username is already taken.' }
+  const refreshProfile = useCallback(async () => {
+    try {
+      applySession(await api<SessionResponse>('/me'))
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) logout()
     }
+  }, [applySession, logout])
 
-    setUserStore(prev => new Map(prev).set(emailKey, { profile, password }))
-    userUsernameIndex.current.set(usernameKey, emailKey)
-    setState({ role: 'user', user: profile, caregiver: null })
-    return { ok: true }
+  // Restore a saved session on page load
+  useEffect(() => {
+    if (!getToken()) return
+    refreshProfile().finally(() => setLoading(false))
+  }, [refreshProfile])
+
+  // Keep pairing info fresh, so a user sees when a caregiver links to them (and vice versa)
+  useEffect(() => {
+    if (!state.role) return
+    const id = setInterval(refreshProfile, PROFILE_REFRESH_MS)
+    return () => clearInterval(id)
+  }, [state.role, refreshProfile])
+
+  // Load the signed-in user's check-in history
+  useEffect(() => {
+    if (state.role !== 'user') return
+    api<ApiZoneEntry[]>('/zone-entries/mine')
+      .then(rows => setMyEntries(rows.map(toEntry)))
+      .catch(() => {})
+  }, [state.role, state.user?.email])
+
+  async function registerUser(profile: UserProfile, password: string): Promise<Result> {
+    try {
+      applySession(await api<SessionResponse>('/signup', { method: 'POST', body: { role: 'user', ...profile, password } }))
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: errorMessage(e) }
+    }
   }
 
-  function registerCaregiver(profile: CaregiverProfile, password: string) {
-    const emailKey = profile.email.toLowerCase()
-    const usernameKey = profile.username.toLowerCase()
-    for (const r of caregiverStore.values()) {
-      if (r.profile.email.toLowerCase() === emailKey) return { ok: false, error: 'An account with that email already exists.' }
-      if (r.profile.username.toLowerCase() === usernameKey) return { ok: false, error: 'That username is already taken.' }
+  async function registerCaregiver(profile: CaregiverProfile, password: string): Promise<Result> {
+    try {
+      applySession(await api<SessionResponse>('/signup', { method: 'POST', body: { role: 'caregiver', ...profile, password } }))
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: errorMessage(e) }
     }
-    // Also check against user usernames
-    if (userUsernameIndex.current.has(usernameKey)) return { ok: false, error: 'That username is already taken.' }
-
-    setCaregiverStore(prev => new Map(prev).set(usernameKey, { profile, password }))
-    setState({ role: 'caregiver', user: null, caregiver: profile })
-    return { ok: true }
   }
 
-  function login(identifier: string, password: string) {
-    const id = identifier.trim().toLowerCase()
-
-    const userRecord = userStore.get(id)
-    if (userRecord) {
-      if (userRecord.password !== password) return { ok: false, error: 'Incorrect password.' }
-      setState({ role: 'user', user: userRecord.profile, caregiver: null })
-      return { ok: true, role: 'user' as Role }
+  async function login(identifier: string, password: string) {
+    try {
+      const s = await api<SessionResponse>('/login', { method: 'POST', body: { identifier, password } })
+      applySession(s)
+      return { ok: true, role: s.role }
+    } catch (e) {
+      return { ok: false, error: errorMessage(e) }
     }
-
-    for (const [, r] of caregiverStore) {
-      if (r.profile.username.toLowerCase() === id || r.profile.email.toLowerCase() === id) {
-        if (r.password !== password) return { ok: false, error: 'Incorrect password.' }
-        setState({ role: 'caregiver', user: null, caregiver: r.profile })
-        return { ok: true, role: 'caregiver' as Role }
-      }
-    }
-
-    return { ok: false, error: 'No account found with that username or email.' }
   }
 
   // Called by a caregiver to link to a user via their @username
-  function pairByUsername(rawUsername: string) {
-    if (!state.caregiver) return { ok: false, error: 'Not signed in as a caregiver.' }
-
-    const username = rawUsername.trim().toLowerCase().replace(/^@/, '')
-    if (!username) return { ok: false, error: 'Please enter a username.' }
-
-    const userEmail = userUsernameIndex.current.get(username)
-    if (!userEmail) return { ok: false, error: 'No user found with that username.' }
-
-    const userRecord = userStore.get(userEmail)
-    if (!userRecord) return { ok: false, error: 'User not found.' }
-    if (userRecord.profile.pairedCaregiverUsername) {
-      return { ok: false, error: 'This user is already paired with a caregiver.' }
+  async function pairByUsername(username: string): Promise<Result> {
+    try {
+      applySession(await api<SessionResponse>('/pair', { method: 'POST', body: { username } }))
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: errorMessage(e) }
     }
-
-    const caregiverUsername = state.caregiver.username.toLowerCase()
-
-    // Prevent a caregiver pairing with the same user twice
-    const existingEmails = state.caregiver.pairedUserEmails ?? []
-    if (existingEmails.includes(userEmail)) {
-      return { ok: false, error: 'You are already paired with this user.' }
-    }
-
-    // Mark user as paired
-    const updatedUser = { ...userRecord.profile, pairedCaregiverUsername: caregiverUsername }
-    setUserStore(prev => {
-      const m = new Map(prev)
-      m.set(userEmail, { ...userRecord, profile: updatedUser })
-      return m
-    })
-
-    // Add user to caregiver's client list
-    const updatedCaregiver = { ...state.caregiver, pairedUserEmails: [...existingEmails, userEmail] }
-    setCaregiverStore(prev => {
-      const m = new Map(prev)
-      const rec = m.get(caregiverUsername)
-      if (rec) m.set(caregiverUsername, { ...rec, profile: updatedCaregiver })
-      return m
-    })
-    setState(s => ({ ...s, caregiver: updatedCaregiver }))
-
-    return { ok: true }
   }
 
+  // Shows the entry immediately, then saves it to the server in the background
   function logZoneEntry(entry: ZoneEntry) {
-    if (!state.user) return
-    const key = state.user.email.toLowerCase()
-    setZoneStore(prev => {
-      const m = new Map(prev)
-      const existing = m.get(key) ?? []
-      m.set(key, [entry, ...existing])
-      return m
-    })
+    if (state.role !== 'user') return
+    setMyEntries(prev => [entry, ...prev])
+    api('/zone-entries', { method: 'POST', body: { ...entry, time: entry.time.toISOString() } })
+      .catch(err => console.error('Failed to save check-in:', err))
   }
 
-  function getClients(): ClientInfo[] {
-    if (!state.caregiver) return []
-    const emails = state.caregiver.pairedUserEmails ?? []
-    return emails.map(email => {
-      const key = email.toLowerCase()
-      const record = userStore.get(key)
-      const entries = zoneStore.get(key) ?? []
-      return {
-        email,
-        firstName: record?.profile.firstName ?? '',
-        lastName: record?.profile.lastName ?? '',
-        username: record?.profile.username ?? '',
-        lastEntry: entries[0] ?? null,
-      }
-    })
+  async function getClients(): Promise<ClientInfo[]> {
+    if (state.role !== 'caregiver') return []
+    const rows = await api<(Omit<ClientInfo, 'lastEntry'> & { lastEntry: ApiZoneEntry | null })[]>('/clients')
+    return rows.map(c => ({ ...c, lastEntry: c.lastEntry ? toEntry(c.lastEntry) : null }))
   }
 
-  // Newest first, since logZoneEntry prepends
+  // Newest first
   function getMyEntries(): ZoneEntry[] {
-    if (!state.user) return []
-    return zoneStore.get(state.user.email.toLowerCase()) ?? []
-  }
-
-  function logout() {
-    setState({ role: null, user: null, caregiver: null })
+    return myEntries
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, registerUser, registerCaregiver, login, pairByUsername, logZoneEntry, getClients, getMyEntries, logout }}>
+    <AuthContext.Provider value={{ ...state, loading, registerUser, registerCaregiver, login, pairByUsername, logZoneEntry, getClients, getMyEntries, logout }}>
       {children}
     </AuthContext.Provider>
   )

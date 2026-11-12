@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth, type ClientInfo, type ZoneColor } from '../contexts/AuthContext'
 import ThemeToggle from '../components/ThemeToggle'
@@ -27,7 +28,28 @@ function formatTimeAgo(date: Date): string {
 export default function ClientsPage() {
   const navigate = useNavigate()
   const { getClients } = useAuth()
-  const clients = getClients()
+  const [clients, setClients] = useState<ClientInfo[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [error, setError] = useState('')
+
+  // Load clients, then refresh every 15s so new check-ins show up without reloading
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const data = await getClients()
+        if (!cancelled) { setClients(data); setError('') }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load clients.')
+      } finally {
+        if (!cancelled) setLoaded(true)
+      }
+    }
+    load()
+    const id = setInterval(load, 15000)
+    return () => { cancelled = true; clearInterval(id) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div style={{
@@ -61,14 +83,17 @@ export default function ClientsPage() {
       <div style={{ marginTop: 4 }}>
         <h1 style={{ color: 'var(--text)', fontSize: 22, fontWeight: 700, marginBottom: 6 }}>My Clients</h1>
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          {clients.length === 0
-            ? 'No clients paired yet.'
-            : `${clients.length} client${clients.length === 1 ? '' : 's'} connected`}
+          {!loaded
+            ? 'Loading…'
+            : clients.length === 0
+              ? 'No clients paired yet.'
+              : `${clients.length} client${clients.length === 1 ? '' : 's'} connected`}
         </p>
+        {error && <p style={{ color: 'var(--red)', fontSize: 13, marginTop: 6 }}>{error}</p>}
       </div>
 
       {/* Empty state */}
-      {clients.length === 0 && (
+      {loaded && !error && clients.length === 0 && (
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
