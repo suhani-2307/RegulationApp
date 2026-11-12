@@ -1,8 +1,18 @@
-import 'dotenv/config'
+import dotenv from 'dotenv'
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
+// Always load server/.env, no matter which folder the server is started from
+const envPath = fileURLToPath(new URL('./.env', import.meta.url))
+dotenv.config({ path: envPath })
+
 if (!process.env.DATABASE_URL) {
-  console.error('DATABASE_URL is not set. Create server/.env with DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/DBNAME')
+  console.error(
+    existsSync(envPath)
+      ? `${envPath} was found but has no DATABASE_URL line. Add: DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/DBNAME`
+      : `No .env file at ${envPath}. Create it with: DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/DBNAME`,
+  )
   process.exit(1)
 }
 
